@@ -1,4 +1,4 @@
-import { createOffer, findOfferByLink } from "../db/queries/offers";
+import { createOffer, findOfferByLink } from "../db/queries/offers.js";
 
 
 export async function saveOfferIfNotExists(offer) {
