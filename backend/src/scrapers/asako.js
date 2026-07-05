@@ -1,5 +1,8 @@
 import puppeteer from "puppeteer";
 import createMessage from "../services/sendMessage.js";
+import getFullDescription from "../services/getFullDescription.js";
+import { saveOfferIfNotExists } from "../services/scraperService.js";
+import formatOffer from "../utils/formatOffer.js";
 
 const offerType = "stages";
 const target = "développeur";
@@ -34,38 +37,31 @@ async function start() {
     });
   });
 
-  console.log(JSON.stringify(stages, null, 2));
+  //console.log(JSON.stringify(stages, null, 2));
 
   // Match the list with the criteria
-  const possibleMatch = stages.filter((stage) => stage.title.toLowerCase().includes(target)
+  const possibleMatch = stages.filter((stage) =>
+    stage.title?.toLowerCase().includes(target.toLowerCase())
   );
 
   if (possibleMatch.length > 0) {
     for (const stage of possibleMatch) {
-      // Open new Page to the browser
-      const fullDescriptionPage = await browser.newPage();
-      await fullDescriptionPage.goto(stage.link);
+      const fullDescription = await getFullDescription(stage, browser);
+      const offerResult = {
+        title: stage.title,
+        type: 'stage',
+        source: 'https://asako.mg',
+        link: stage.link,
+        description: fullDescription,
+        company: stage.company
+      }
 
-      // Get the article tag
-      const fullDescriptionText = await fullDescriptionPage.evaluate(() => {
-        const descriptions = document.querySelectorAll("article div p");
-        let description = "";
-        descriptions.forEach((p) => {
-          description += `${p.textContent}\n`;
-        });
-
-        return description;
-      });
-
-      // Format offer details
-      const offerDetails = `${stage.title}\n\n Company: ${stage.company}\n\n Link: ${stage.link}\n\nDescription:\n${fullDescriptionText}`;
-
-      // Send the offer details as a message
-      await createMessage(offerDetails);
-      console.log(`Message sent for: ${stage.title}`);
-
-      // Close the page
-      await fullDescriptionPage.close();
+      // Save offer if not exists in the db
+      const createdOffer = await saveOfferIfNotExists(offerResult);
+      if (createdOffer) {
+        // Send it via Twilio
+        await createMessage(formatOffer(offerResult));
+      }
     }
   }
 
