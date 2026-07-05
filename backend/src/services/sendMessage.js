@@ -10,16 +10,34 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const myPhoneNumber = process.env.MY_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 
-async function createMessage(fullMessage) {
-  const message = await client.messages.create({
-    //contentSid: "HXb5b62575e6e4ff6129ad7c8efe1f983e",
-    body: fullMessage,
-    //contentVariables: JSON.stringify({ 1: "22 July 2026", 2: "3:15pm" }),
-    from: `whatsapp:${twilioPhoneNumber}`,
-    to: `whatsapp:${myPhoneNumber}`,
-  });
+function truncateMessageBody(text, maxLength = 1500) {
+  if (!text) return "";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
 
-  console.log("Message sent:", message.sid);
+async function createMessage(fullMessage) {
+  if (!accountSid || !authToken || !twilioPhoneNumber || !myPhoneNumber) {
+    throw new Error("Twilio environment variables are missing");
+  }
+
+  const safeMessage = truncateMessageBody(fullMessage);
+
+  try {
+    const message = await client.messages.create({
+      body: safeMessage,
+      from: `whatsapp:${twilioPhoneNumber}`,
+      to: `whatsapp:${myPhoneNumber}`,
+    });
+
+    console.log("Message sent:", message.sid);
+    return message;
+  } catch (error) {
+    console.error("Twilio message failed:", error.message);
+    if (error?.code) {
+      console.error("Twilio error code:", error.code);
+    }
+    throw error;
+  }
 }
 
 export default createMessage;
